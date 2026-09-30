@@ -11,7 +11,8 @@ const float VOL_AFSTAND_MM = 50;  // zelf invullen
 const unsigned long MAX_POMPTIJD_MS = 30000;
 const float GELUIDSSNELHEID = 0.0343;
 
-SemaphoreHandle_t xStartSeintje;
+SemaphoreHandle_t xPompStartSeintje;
+SemaphoreHandle_t xPompParaatSeintje;
 
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 
@@ -36,9 +37,16 @@ void zetOpLcd(const char* l1, const char* l2) {
 
 void TaskKnop(void *pvParameters) {
   for (;;) {
-    if (digitalRead(KNOP_PIN) == LOW) {
-      xSemaphoreGive(xStartSeintje);
-      vTaskDelay(pdMS_TO_TICKS(500));
+    static bool isPressed = false;
+
+    if (digitalRead(KNOP_PIN) == LOW && !isPressed) {
+      isPressed = true;
+      xSemaphoreTake(xPompParaatSeintje, portMAX_DELAY);
+      xSemaphoreGive(xPompStartSeintje);
+      Serial.println("Semaphore given");
+    }
+    else if (digitalRead(KNOP_PIN) == HIGH && isPressed) {
+    isPressed = false;
     }
     vTaskDelay(pdMS_TO_TICKS(20));
   }
@@ -46,7 +54,10 @@ void TaskKnop(void *pvParameters) {
 
 void TaskPomp(void *pvParameters) {
   for (;;) {
-    xSemaphoreTake(xStartSeintje, portMAX_DELAY);
+    
+    xSemaphoreTake(xPompStartSeintje, portMAX_DELAY);
+
+    Serial.println("Semaphore taken");
 
     vTaskDelay(pdMS_TO_TICKS(1000));
     digitalWrite(POMP_PIN, HIGH);
@@ -67,8 +78,10 @@ void TaskPomp(void *pvParameters) {
 
     digitalWrite(POMP_PIN, LOW);
 
-    vTaskDelay(pdMS_TO_TICKS(5000));
+    vTaskDelay(pdMS_TO_TICKS(1000));
     zetOpLcd("Glasvuller 3000", "Druk op de knop");
+    Serial.println("Done");
+    xSemaphoreGive(xPompParaatSeintje);
   }
 }
 
@@ -80,7 +93,10 @@ void setup() {
   pinMode(KNOP_PIN, INPUT_PULLUP);  // knop tussen pin en GND
   digitalWrite(POMP_PIN, LOW);
 
-  xStartSeintje = xSemaphoreCreateBinary();
+  xPompStartSeintje = xSemaphoreCreateBinary();
+  xPompParaatSeintje = xSemaphoreCreateBinary();
+  
+  xSemaphoreGive(xPompParaatSeintje);
 
   lcd.init();
   lcd.backlight();
