@@ -73,7 +73,7 @@ void TaskPomp(void* pvParameters) {
       float afstand = meetAfstandMM();
       Serial.println(afstand);
 
-      if (afstand > -1 && afstand <= VOL_AFSTAND_MM) {
+      if (afstand > 0 && afstand <= VOL_AFSTAND_MM) {
         zetOpLcd("Glas gevuld!", "Pak uw glas.");
         break;
       }
